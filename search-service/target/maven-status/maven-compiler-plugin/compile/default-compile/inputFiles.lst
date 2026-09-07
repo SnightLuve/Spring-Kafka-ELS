@@ -1,0 +1,13 @@
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\config\ElasticsearchConfig.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\config\ElasticsearchIndexInitializer.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\config\KafkaConsumerConfig.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\config\ObjectMapperConfig.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\config\RedisConfig.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\controller\SearchController.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\document\ProductDocument.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\dto\SearchRequest.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\event\ProductSyncEvent.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\kafka\ProductEventConsumer.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\repository\ProductSearchRepository.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\SearchServiceApplication.java
+D:\ELS\ELS\microservices\search-service\src\main\java\com\example\searchservice\service\ProductSearchService.java

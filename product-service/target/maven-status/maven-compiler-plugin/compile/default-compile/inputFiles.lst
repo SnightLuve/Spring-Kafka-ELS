@@ -1,0 +1,10 @@
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\config\KafkaProducerConfig.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\config\ObjectMapperConfig.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\controller\ProductController.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\dto\ProductDTO.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\entity\Product.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\event\ProductSyncEvent.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\kafka\ProductEventProducer.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\ProductServiceApplication.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\repository\ProductRepository.java
+D:\ELS\ELS\microservices\product-service\src\main\java\com\example\productservice\service\ProductService.java

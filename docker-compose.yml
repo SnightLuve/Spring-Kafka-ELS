@@ -1,0 +1,144 @@
+services:
+  product-service:
+    build:
+      context: ./product-service
+    container_name: els-product-service
+    environment:
+      SQLSERVER_URL: jdbc:sqlserver://sqlserver:1433;databaseName=db;encrypt=true;trustServerCertificate=true
+      SQLSERVER_USERNAME: sa
+      SQLSERVER_PASSWORD: YourPassword@123
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      PRODUCT_SYNC_TOPIC: product-sync-topic
+    ports:
+      - "8082:8082"
+    depends_on:
+      - sqlserver
+      - kafka
+    networks:
+      - els-network
+
+  search-service:
+    build:
+      context: ./search-service
+    container_name: els-search-service
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      PRODUCT_SYNC_GROUP_ID: search-service-product-sync-group
+      PRODUCT_SYNC_TOPIC: product-sync-topic
+      ELASTICSEARCH_URIS: http://elasticsearch:9200
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - elasticsearch
+      - redis
+    networks:
+      - els-network
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: els-sqlserver-ms
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourPassword@123"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - els-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    container_name: els-elasticsearch-ms
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - els-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.0.0
+    container_name: els-kibana-ms
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - els-network
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: els-kafka-ms
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "9092:9092"
+    networks:
+      - els-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: els-kafka-ui-ms
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: els-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8090:8080"
+    networks:
+      - els-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: els-redis-ms
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - els-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: els-redis-commander-ms
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - els-network
+
+volumes:
+  sqlserver-data:
+  elasticsearch-data:
+  redis-data:
+
+networks:
+  els-network:
+    driver: bridge

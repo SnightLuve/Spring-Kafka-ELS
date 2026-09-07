@@ -1,0 +1,33 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: product-service
+
+  datasource:
+    url: ${SQLSERVER_URL:jdbc:sqlserver://localhost:1433;databaseName=db;encrypt=true;trustServerCertificate=true}
+    username: ${SQLSERVER_USERNAME:sa}
+    password: ${SQLSERVER_PASSWORD:123}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.SQLServerDialect
+        format_sql: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+kafka:
+  topic:
+    product-sync: ${PRODUCT_SYNC_TOPIC:product-sync-topic}
+
+logging:
+  level:
+    com.example.productservice: DEBUG
+    org.springframework.kafka: INFO

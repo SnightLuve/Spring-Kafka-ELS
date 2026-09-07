@@ -1,0 +1,46 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: search-service
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 5s
+    socket-timeout: 30s
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${PRODUCT_SYNC_GROUP_ID:search-service-product-sync-group}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-wait: -1ms
+          max-idle: 5
+          min-idle: 1
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000ms
+      key-prefix: "search-service:"
+      use-key-prefix: true
+      cache-null-values: false
+
+kafka:
+  topic:
+    product-sync: ${PRODUCT_SYNC_TOPIC:product-sync-topic}
+
+logging:
+  level:
+    com.example.searchservice: DEBUG
+    org.springframework.data.elasticsearch: DEBUG
+    org.springframework.kafka: INFO
