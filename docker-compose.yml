@@ -9,11 +9,16 @@ services:
       SQLSERVER_PASSWORD: YourPassword@123
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       PRODUCT_SYNC_TOPIC: product-sync-topic
+      ELASTIC_APM_SERVICE_NAME: product-service
+      ELASTIC_APM_SERVER_URLS: http://apm-server:8200
+      ELASTIC_APM_ENVIRONMENT: docker
+      ELASTIC_APM_TRANSACTION_SAMPLE_RATE: "1.0"
     ports:
       - "8082:8082"
     depends_on:
       - sqlserver
       - kafka
+      - apm-server
     networks:
       - els-network
 
@@ -28,12 +33,17 @@ services:
       ELASTICSEARCH_URIS: http://elasticsearch:9200
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      ELASTIC_APM_SERVICE_NAME: search-service
+      ELASTIC_APM_SERVER_URLS: http://apm-server:8200
+      ELASTIC_APM_ENVIRONMENT: docker
+      ELASTIC_APM_TRANSACTION_SAMPLE_RATE: "1.0"
     ports:
       - "8083:8083"
     depends_on:
       - kafka
       - elasticsearch
       - redis
+      - apm-server
     networks:
       - els-network
 
@@ -72,6 +82,23 @@ services:
       ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
     ports:
       - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - els-network
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:9.0.0
+    container_name: els-apm-server-ms
+    command:
+      - apm-server
+      - -e
+      - -E
+      - apm-server.host=0.0.0.0:8200
+      - -E
+      - output.elasticsearch.hosts=["http://elasticsearch:9200"]
+    ports:
+      - "8200:8200"
     depends_on:
       - elasticsearch
     networks:
