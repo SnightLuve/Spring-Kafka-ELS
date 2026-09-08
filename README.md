@@ -17,12 +17,25 @@ Kafka topic product-sync-topic
 
 | Service | Port | Vai tro |
 | --- | --- | --- |
-| `product-service` | `8082` | CRUD Product, luu SQL Server, publish event sang Kafka |
-| `search-service` | `8083` | Search Product, consume Kafka event, index vao Elasticsearch, cache Redis |
+| `product-service` | `18082 -> 8082` | CRUD Product, luu SQL Server, publish event sang Kafka |
+| `search-service` | `18083 -> 8083` | Search Product, consume Kafka event, index vao Elasticsearch, cache Redis |
 | `apm-server` | `8200` | Nhan trace/metric tu 2 Java service |
 | `kibana` | `5601` | Xem APM, logs, Elasticsearch data |
 | `kafka-ui` | `8090` | Xem Kafka topic/message |
 | `redis-commander` | `8081` | Xem Redis cache |
+
+Khi chay file `microservices/docker-compose.yml`, cac port expose ra may host duoc doi sang dai rieng de co the chay song song voi stack goc:
+
+| Service | Port trong container | Port tren may host |
+| --- | --- | --- |
+| SQL Server | `1433` | `11433` |
+| Elasticsearch | `9200` | `19200` |
+| Kibana | `5601` | `15601` |
+| APM Server | `8200` | `18200` |
+| Kafka | `9092` | `19092` |
+| Kafka UI | `8080` | `18090` |
+| Redis | `6379` | `16379` |
+| Redis Commander | `8081` | `18081` |
 
 ## Yeu Cau
 
@@ -120,11 +133,24 @@ mvn spring-boot:run
 Khi chay local, config mac dinh dang dung:
 
 ```text
-SQL Server:     localhost:1433
-Kafka:          localhost:9092
-Elasticsearch:  http://localhost:9200
-Redis:          localhost:6379
-APM Server:     http://localhost:8200
+SQL Server:     localhost:11433
+Kafka:          localhost:19092
+Elasticsearch:  http://localhost:19200
+Redis:          localhost:16379
+APM Server:     http://localhost:18200
+```
+
+Neu chay local bang Maven va dung infrastructure cua `microservices/docker-compose.yml`, set cac bien moi truong:
+
+```powershell
+$env:SQLSERVER_URL="jdbc:sqlserver://localhost:11433;databaseName=db;encrypt=true;trustServerCertificate=true"
+$env:KAFKA_BOOTSTRAP_SERVERS="localhost:19092"
+$env:ELASTICSEARCH_URIS="http://localhost:19200"
+$env:ELASTICSEARCH_USERNAME="elastic"
+$env:ELASTICSEARCH_PASSWORD="YourPassword@123"
+$env:REDIS_HOST="localhost"
+$env:REDIS_PORT="16379"
+$env:ELASTIC_APM_SERVER_URLS="http://localhost:18200"
 ```
 
 ## Test API
@@ -134,7 +160,7 @@ Tao product:
 ```powershell
 Invoke-RestMethod `
   -Method Post `
-  -Uri http://localhost:8082/api/products `
+  -Uri http://localhost:18082/api/products `
   -ContentType "application/json" `
   -Body '{"name":"Samsung Galaxy S24","description":"Android phone","price":25990000,"category":"Phone","brand":"Samsung"}'
 ```
@@ -142,19 +168,19 @@ Invoke-RestMethod `
 Tim kiem product:
 
 ```powershell
-Invoke-RestMethod "http://localhost:8083/api/search?keyword=samsung"
+Invoke-RestMethod "http://localhost:18083/api/search?keyword=samsung"
 ```
 
 Goi y tim kiem:
 
 ```powershell
-Invoke-RestMethod "http://localhost:8083/api/search/suggest?q=sam"
+Invoke-RestMethod "http://localhost:18083/api/search/suggest?q=sam"
 ```
 
 Neu Elasticsearch chua co data, goi reindex:
 
 ```powershell
-Invoke-RestMethod -Method Post http://localhost:8082/api/products/reindex
+Invoke-RestMethod -Method Post http://localhost:18082/api/products/reindex
 ```
 
 ## Xem APM
@@ -169,13 +195,20 @@ search-service/src/main/java/com/example/searchservice/SearchServiceApplication.
 Mo Kibana:
 
 ```text
-http://localhost:5601
+http://localhost:15601
 ```
 
-Vao man hinh APM:
+Dang nhap Kibana:
 
 ```text
-http://localhost:5601/app/apm
+Username: elastic
+Password: YourPassword@123
+```
+
+Vao man hinh danh sach service APM:
+
+```text
+http://localhost:15601/app/apm/services
 ```
 
 Hoac trong Kibana chon:
@@ -189,6 +222,27 @@ Sau khi goi API vai lan, ban se thay 2 service:
 ```text
 product-service
 search-service
+```
+
+Neu ban mo trang APM setup/onboarding va thay nhieu loi `403 Forbidden` voi duong dan `/api/fleet/...`, do la phan Fleet-managed setup cua Kibana. Project nay dang dung standalone `apm-server`, khong dung Fleet-managed APM, nen hay xem trang Services sau khi da goi API tao trace:
+
+```text
+http://localhost:15601/app/apm/services
+```
+
+Trong `docker-compose.yml`, Kibana da duoc cau hinh de Fleet UI co the nap dung hon trong moi truong dev:
+
+```yaml
+XPACK_FLEET_AGENTS_ENABLED: "true"
+XPACK_FLEET_ISAIRGAPPED: "true"
+```
+
+Neu van thay loi cu trong trinh duyet, hay recreate container va refresh lai tab Kibana:
+
+```powershell
+cd D:\ELS\ELS\microservices
+docker compose down
+docker compose up -d --build
 ```
 
 Trong APM co the xem:
@@ -224,9 +278,16 @@ ELASTIC_APM_TRANSACTION_SAMPLE_RATE: "1.0"
 Khi chay local, service tu dung mac dinh:
 
 ```text
-ELASTIC_APM_SERVER_URLS=http://localhost:8200
+ELASTIC_APM_SERVER_URLS=http://localhost:18200
 ELASTIC_APM_ENVIRONMENT=local
 ELASTIC_APM_TRANSACTION_SAMPLE_RATE=1.0
+```
+
+Neu chay `search-service` local voi Elasticsearch secure trong Docker Compose, set them:
+
+```powershell
+$env:ELASTICSEARCH_USERNAME="elastic"
+$env:ELASTICSEARCH_PASSWORD="YourPassword@123"
 ```
 
 ## Kafka Contract
@@ -257,11 +318,11 @@ Voi DELETE, chi can:
 
 ## Loi Thuong Gap
 
-### Kafka bao `Bootstrap broker localhost:9092 disconnected`
+### Kafka bao `Bootstrap broker localhost:19092 disconnected`
 
 Kiem tra service dang chay o dau:
 
-- Chay local bang Maven: dung `localhost:9092`
+- Chay local bang Maven voi stack microservices: dung `localhost:19092`
 - Chay trong Docker Compose: dung `kafka:29092`
 
 Trong `docker-compose.yml` da cau hinh san:
@@ -275,16 +336,16 @@ KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 Dam bao Elasticsearch URI la:
 
 ```text
-http://localhost:9200
+http://localhost:19200
 ```
 
 Khong duoc goi HTTP vao Kafka port:
 
 ```text
-http://localhost:9092
+http://localhost:19092
 ```
 
-Kafka port `9092` chi danh cho Kafka client, khong phai HTTP.
+Kafka port `19092` tren may host chi danh cho Kafka client, khong phai HTTP.
 
 ### Khong thay service trong Kibana APM
 
@@ -300,6 +361,6 @@ docker compose logs -f search-service
 Sau do goi API vai lan de tao trace:
 
 ```powershell
-Invoke-RestMethod http://localhost:8082/api/products
-Invoke-RestMethod "http://localhost:8083/api/search?keyword=samsung"
+Invoke-RestMethod http://localhost:18082/api/products
+Invoke-RestMethod "http://localhost:18083/api/search?keyword=samsung"
 ```

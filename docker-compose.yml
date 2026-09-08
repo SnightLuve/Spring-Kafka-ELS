@@ -14,11 +14,14 @@ services:
       ELASTIC_APM_ENVIRONMENT: docker
       ELASTIC_APM_TRANSACTION_SAMPLE_RATE: "1.0"
     ports:
-      - "8082:8082"
+      - "18082:8082"
     depends_on:
-      - sqlserver
-      - kafka
-      - apm-server
+      sqlserver-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+      apm-server:
+        condition: service_started
     networks:
       - els-network
 
@@ -31,6 +34,8 @@ services:
       PRODUCT_SYNC_GROUP_ID: search-service-product-sync-group
       PRODUCT_SYNC_TOPIC: product-sync-topic
       ELASTICSEARCH_URIS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: elastic
+      ELASTICSEARCH_PASSWORD: YourPassword@123
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ELASTIC_APM_SERVICE_NAME: search-service
@@ -38,7 +43,7 @@ services:
       ELASTIC_APM_ENVIRONMENT: docker
       ELASTIC_APM_TRANSACTION_SAMPLE_RATE: "1.0"
     ports:
-      - "8083:8083"
+      - "18083:8083"
     depends_on:
       - kafka
       - elasticsearch
@@ -54,9 +59,25 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "YourPassword@123"
     ports:
-      - "1433:1433"
+      - "11433:1433"
     volumes:
       - sqlserver-data:/var/opt/mssql
+    networks:
+      - els-network
+
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: els-sqlserver-init-ms
+    command: >
+      bash -c '
+        echo "Waiting for SQL Server...";
+        until /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "YourPassword@123" -C -Q "SELECT 1" > /dev/null 2>&1; do sleep 5; done;
+        echo "Creating database db if missing...";
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "YourPassword@123" -C -Q "IF DB_ID(NCHAR(100)+NCHAR(98)) IS NULL CREATE DATABASE [db];";
+        echo "SQL Server setup complete.";
+      '
+    depends_on:
+      - sqlserver
     networks:
       - els-network
 
@@ -65,11 +86,15 @@ services:
     container_name: els-elasticsearch-ms
     environment:
       discovery.type: single-node
-      xpack.security.enabled: "false"
+      xpack.security.enabled: "true"
+      xpack.security.authc.api_key.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      ELASTIC_PASSWORD: "YourPassword@123"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "19200:9200"
+      - "19300:9300"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
     networks:
@@ -80,8 +105,32 @@ services:
     container_name: els-kibana-ms
     environment:
       ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+      ELASTICSEARCH_USERNAME: "kibana_system"
+      ELASTICSEARCH_PASSWORD: "YourPassword@123"
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "els_microservices_dev_key_32_chars"
+      XPACK_FLEET_AGENTS_ENABLED: "true"
+      XPACK_FLEET_ISAIRGAPPED: "true"
+      XPACK_FLEET_AGENTS_ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      XPACK_FLEET_AGENTS_FLEET_SERVER_HOSTS: '["http://localhost:18220"]'
     ports:
-      - "5601:5601"
+      - "15601:5601"
+    depends_on:
+      - setup
+    networks:
+      - els-network
+
+  setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.0.0
+    container_name: els-setup-ms
+    user: "0"
+    command: >
+      bash -c '
+        echo "Waiting for Elasticsearch...";
+        until curl -s -u "elastic:YourPassword@123" -o /dev/null -w "%{http_code}" "http://elasticsearch:9200/_cluster/health" | grep -q "200"; do sleep 5; done;
+        echo "Setting kibana_system password...";
+        until curl -s -u "elastic:YourPassword@123" -X POST "http://elasticsearch:9200/_security/user/kibana_system/_password" -H "Content-Type: application/json" -d "{\"password\":\"YourPassword@123\"}" | grep -q "^{}"; do sleep 5; done;
+        echo "Elastic setup complete.";
+      '
     depends_on:
       - elasticsearch
     networks:
@@ -91,16 +140,30 @@ services:
     image: docker.elastic.co/apm/apm-server:9.0.0
     container_name: els-apm-server-ms
     command:
-      - apm-server
       - -e
       - -E
       - apm-server.host=0.0.0.0:8200
       - -E
       - output.elasticsearch.hosts=["http://elasticsearch:9200"]
+      - -E
+      - output.elasticsearch.username=elastic
+      - -E
+      - output.elasticsearch.password=YourPassword@123
+      - -E
+      - apm-server.kibana.enabled=true
+      - -E
+      - apm-server.kibana.host=http://kibana:5601
+      - -E
+      - apm-server.kibana.username=elastic
+      - -E
+      - apm-server.kibana.password=YourPassword@123
+      - -E
+      - apm-server.auth.anonymous.enabled=true
     ports:
-      - "8200:8200"
+      - "18200:8200"
     depends_on:
       - elasticsearch
+      - kibana
     networks:
       - els-network
 
@@ -113,7 +176,7 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://kafka:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:19092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -121,7 +184,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     ports:
-      - "9092:9092"
+      - "19092:9092"
     networks:
       - els-network
 
@@ -134,7 +197,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: els-cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     ports:
-      - "8090:8080"
+      - "18090:8080"
     networks:
       - els-network
 
@@ -142,7 +205,7 @@ services:
     image: redis:7.2-alpine
     container_name: els-redis-ms
     ports:
-      - "6379:6379"
+      - "16379:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
@@ -155,7 +218,7 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
     ports:
-      - "8081:8081"
+      - "18081:8081"
     depends_on:
       - redis
     networks:
